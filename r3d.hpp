@@ -660,8 +660,8 @@ R3D_INLINE void reduce(Polytope<3> const &poly, Real *moments) {
  * \details Uses the fast recursive method of Koehl (2012) to carry out the
  * integration.
  * The template parameter is the order of the polynomial density field.
- * 0 for constant (1 moment), 1 for linear (4 moments),
- * 2 for quadratic (10 moments), etc.
+ * 0 for constant (1 moment), 1 for linear (3 moments),
+ * 2 for quadratic (6 moments), etc.
  *
  * \param [in] poly
  * The polygon over which to integrate.
