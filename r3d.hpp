@@ -798,27 +798,27 @@ R3D_INLINE void intersect_simplices(Polytope<dim> &poly,
  * \brief Initialize a general polyhedron from a full boundary description.
  *
  * \param [out] poly
- * The polyhedron to initialize. 
+ * The polyhedron to initialize.
  *
  * \param [in] vertices
- * Array of length `numverts` giving the vertices of the input polyhedron. 
+ * Array of length `numverts` giving the vertices of the input polyhedron.
  *
  * \param [in] numverts
- * Number of vertices in the input polyhedron. 
+ * Number of vertices in the input polyhedron.
  *
  * \param [in] faceinds
- * Connectivity array, giving the indices of vertices in the 
+ * Connectivity array, giving the indices of vertices in the
  * order they appear around each face of the input polyhedron.
  *
  * \param [in] numvertsperface
  * An array of length `numfaces` giving the number of vertices for each face
- * of the input polyhedron. 
+ * of the input polyhedron.
  *
  * \param [in] numfaces
- * Number of faces in the input polyhedron. 
+ * Number of faces in the input polyhedron.
  *
  */
-void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts, 
+void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts,
 					Int** faceinds, Int* numvertsperface, Int numfaces) {
 	// dummy vars
 	Int v, vprev, vcur, vnext, f, np;
@@ -846,8 +846,8 @@ void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts,
 			poly.verts[v].pos = vertices[v];
 			for(np = 0; np < 3; ++np) poly.verts[v].pnbrs[np] = R3D_MAX_VERTS;
 		}
-	
-		// build graph connectivity by correctly orienting half-edges for each vertex 
+
+		// build graph connectivity by correctly orienting half-edges for each vertex
 		for(f = 0; f < numfaces; ++f) {
 			for(v = 0; v < numvertsperface[f]; ++v) {
 				vprev = faceinds[f][v];
@@ -894,7 +894,7 @@ void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts,
 				vbtmp[poly.nverts].pos = vertices[v];
 				for(np = 0; np < 3; ++np) vbtmp[poly.nverts].pnbrs[np] = R3D_MAX_VERTS;
 				++(poly.nverts);
-			}	
+			}
 		}
 
 		// fill in connectivity for all duplicates
@@ -936,7 +936,7 @@ void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts,
 		for(v1 = v0 + 1; v1 < numverts; ++v1) {
 			for(v00 = vstart[v0]; v00 < vstart[v0] + eperv[v0]; ++v00)
 			for(v11 = vstart[v1]; v11 < vstart[v1] + eperv[v1]; ++v11) {
-				if(vbtmp[v00].pnbrs[1] == v1 && vbtmp[v11].pnbrs[1] == v0 
+				if(vbtmp[v00].pnbrs[1] == v1 && vbtmp[v11].pnbrs[1] == v0
 						&& !util[v00] && !util[v11]) {
 					vbtmp[v00].pnbrs[1] = v11;
 					vbtmp[v11].pnbrs[1] = v00;
@@ -974,7 +974,7 @@ void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts,
 			}
 		}
 		poly.nverts = numunclipped;
-		for(v = 0; v < poly.nverts; ++v) 
+		for(v = 0; v < poly.nverts; ++v)
 			for(np = 0; np < 3; ++np)
 				poly.verts[v].pnbrs[np] = util[poly.verts[v].pnbrs[np]];
     }
@@ -982,16 +982,16 @@ void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts,
 }
 
 /**
- * \brief Initialize a (simply-connected) general polygon from a list of vertices. 
+ * \brief Initialize a (simply-connected) general polygon from a list of vertices.
  *
  * \param [out] poly
- * The polygon to initialize. 
+ * The polygon to initialize.
  *
  * \param [in] vertices
  * Array of length `numverts` giving the vertices of the input polygon, in counterclockwise order.
  *
  * \param [in] numverts
- * Number of vertices in the input polygon. 
+ * Number of vertices in the input polygon.
  *
  */
 void init_poly(Polytope<2>& poly, Vector<2>* vertices, Int numverts) {
@@ -1012,34 +1012,34 @@ void init_poly(Polytope<2>& poly, Vector<2>* vertices, Int numverts) {
  * Array of planes of length `numfaces` defining the faces of the polyhedron.
  *
  * \param [in] vertices
- * Array of length `numverts` giving the vertices of the input polyhedron. 
+ * Array of length `numverts` giving the vertices of the input polyhedron.
  *
  * \param [in] numverts
- * Number of vertices in the input polyhedron. 
+ * Number of vertices in the input polyhedron.
  *
  * \param [in] faceinds
- * Connectivity array, giving the indices of vertices in the 
+ * Connectivity array, giving the indices of vertices in the
  * order they appear around each face of the input polyhedron.
  *
  * \param [in] numvertsperface
  * An array of length `numfaces` giving the number of vertices for each face
- * of the input polyhedron. 
+ * of the input polyhedron.
  *
  * \param [in] numfaces
- * Number of faces in the input polyhedron. 
+ * Number of faces in the input polyhedron.
  *
  */
-void poly_faces_from_verts(Plane<3>* faces, Vector<3>* vertices, Int numverts, 
+void poly_faces_from_verts(Plane<3>* faces, Vector<3>* vertices, Int numverts,
 						Int** faceinds, Int* numvertsperface, Int numfaces) {
 	// dummy vars
 	Int v, f;
 	Vector<3> p0, p1, p2;
 
-	// calculate a centroid and a unit normal for each face 
+	// calculate a centroid and a unit normal for each face
 	for(f = 0; f < numfaces; ++f) {
     auto centroid = vector_3(0,0,0);
     faces[f].n = vector_3(0,0,0);
-		
+
 		for(v = 0; v < numvertsperface[f]; ++v) {
 
 			// add cross product of edges to the total normal
