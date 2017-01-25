@@ -40,6 +40,14 @@
 #define R3D_INLINE inline
 #endif
 
+#ifndef R2D_MAX_VERTS
+#define R2D_MAX_VERTS 64
+#endif
+
+#ifndef R3D_MAX_VERTS
+#define R3D_MAX_VERTS 128
+#endif
+
 namespace r3d {
 
 using Real = double;
@@ -57,7 +65,8 @@ template <> struct ArithTraits<double> {
 
 R3D_INLINE Real cube(Real x) { return x * x * x; }
 
-R3D_INLINE Real square(Real x) { return x * x; }
+template <typename T>
+constexpr R3D_INLINE T square(T x) { return x * x; }
 
 template <typename T, Int n> class Few {
   using UninitT = typename std::aligned_storage<sizeof(T), alignof(T)>::type;
@@ -216,11 +225,11 @@ template <Int dim> struct Vertex {
 template <Int dim> struct MaxVerts;
 
 template <> struct MaxVerts<2> {
-  enum { value = 64 };
+  enum { value = R2D_MAX_VERTS };
 };
 
 template <> struct MaxVerts<3> {
-  enum { value = 128 };
+  enum { value = R3D_MAX_VERTS };
 };
 
 /**
@@ -300,8 +309,8 @@ template <> struct ClipHelper<2> {
  * An array of planes against which to clip this polygon.
  *
  */
-template <Int dim, Int nplanes>
-R3D_INLINE void clip(Polytope<dim> &poly, Few<Plane<dim>, nplanes> planes) {
+template <Int dim>
+R3D_INLINE void clip(Polytope<dim> &poly, Plane<dim>* planes, Int nplanes) {
   if (poly.nverts <= 0)
     return;
 
@@ -373,6 +382,11 @@ R3D_INLINE void clip(Polytope<dim> &poly, Few<Plane<dim>, nplanes> planes) {
       for (np = 0; np < dim; ++np)
         poly.verts[v].pnbrs[np] = clipped[poly.verts[v].pnbrs[np]];
   }
+}
+
+template <Int dim, Int nplanes>
+R3D_INLINE void clip(Polytope<dim> &poly, Few<Plane<dim>, nplanes> planes) {
+  clip(poly, &planes[0], nplanes);
 }
 
 /**
@@ -778,6 +792,169 @@ R3D_INLINE void intersect_simplices(Polytope<dim> &poly,
   init(poly, verts0);
   auto faces1 = faces_from_verts(verts1);
   clip(poly, faces1);
+}
+
+void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts, 
+					Int** faceinds, Int* numvertsperface, Int numfaces) {
+	// dummy vars
+	Int v, vprev, vcur, vnext, f, np;
+
+	// count up the number of faces per vertex
+	// and act accordingly
+	Int eperv[R3D_MAX_VERTS] = {0};
+	Int maxeperv = 0;
+	for(f = 0; f < numfaces; ++f)
+		for(v = 0; v < numvertsperface[f]; ++v)
+			++eperv[faceinds[f][v]];
+	for(v = 0; v < numverts; ++v)
+		if(eperv[v] > maxeperv) maxeperv = eperv[v];
+
+	// clear the poly
+	poly.nverts = 0;
+
+	if(maxeperv == 3) {
+
+		// simple case with no need for duplicate vertices
+
+		// read in vertex locations
+		poly.nverts = numverts;
+		for(v = 0; v < poly.nverts; ++v) {
+			poly.verts[v].pos = vertices[v];
+			for(np = 0; np < 3; ++np) poly.verts[v].pnbrs[np] = R3D_MAX_VERTS;
+		}
+	
+		// build graph connectivity by correctly orienting half-edges for each vertex 
+		for(f = 0; f < numfaces; ++f) {
+			for(v = 0; v < numvertsperface[f]; ++v) {
+				vprev = faceinds[f][v];
+				vcur = faceinds[f][(v+1)%numvertsperface[f]];
+				vnext = faceinds[f][(v+2)%numvertsperface[f]];
+				for(np = 0; np < 3; ++np) {
+					if(poly.verts[vcur].pnbrs[np] == vprev) {
+						poly.verts[vcur].pnbrs[(np+2)%3] = vnext;
+						break;
+					}
+					else if(poly.verts[vcur].pnbrs[np] == vnext) {
+						poly.verts[vcur].pnbrs[(np+1)%3] = vprev;
+						break;
+					}
+				}
+				if(np == 3) {
+					poly.verts[vcur].pnbrs[1] = vprev;
+					poly.verts[vcur].pnbrs[0] = vnext;
+				}
+			}
+		}
+	}
+	else {
+
+		// we need to create duplicate, degenerate vertices to account for more than
+		// three edges per vertex. This is complicated.
+
+		Int tface = 0;
+		for(v = 0; v < numverts; ++v) tface += eperv[v];
+
+		// need more variables
+		Int v0, v1, v00, v11, numunclipped;
+
+		// we need a few extra buffers to handle the necessary operations
+		r3d_vertex vbtmp[3*R3D_MAX_VERTS];
+		Int vstart[R3D_MAX_VERTS];
+
+		// build vertex mappings to degenerate duplicates
+		// and read in vertex locations
+		poly.nverts = 0;
+		for(v = 0; v < numverts; ++v) {
+			vstart[v] = poly.nverts;
+			for(vcur = 0; vcur < eperv[v]; ++vcur) {
+				vbtmp[poly.nverts].pos = vertices[v];
+				for(np = 0; np < 3; ++np) vbtmp[poly.nverts].pnbrs[np] = R3D_MAX_VERTS;
+				++(poly.nverts);
+			}	
+		}
+
+		// fill in connectivity for all duplicates
+    {
+		Int util[3*R3D_MAX_VERTS] = {0};
+		for(f = 0; f < numfaces; ++f) {
+			for(v = 0; v < numvertsperface[f]; ++v) {
+				vprev = faceinds[f][v];
+				vcur = faceinds[f][(v+1)%numvertsperface[f]];
+				vnext = faceinds[f][(v+2)%numvertsperface[f]];
+				vcur = vstart[vcur] + util[vcur]++;
+				vbtmp[vcur].pnbrs[1] = vnext;
+				vbtmp[vcur].pnbrs[2] = vprev;
+			}
+		}
+    }
+
+		// link degenerate duplicates, putting them in the correct order
+		// use util to mark and avoid double-processing verts
+    {
+		Int util[3*R3D_MAX_VERTS] = {0};
+		for(v = 0; v < numverts; ++v) {
+			for(v0 = vstart[v]; v0 < vstart[v] + eperv[v]; ++v0) {
+				for(v1 = vstart[v]; v1 < vstart[v] + eperv[v]; ++v1) {
+					if(vbtmp[v0].pnbrs[2] == vbtmp[v1].pnbrs[1] && !util[v0]) {
+						vbtmp[v0].pnbrs[2] = v1;
+						vbtmp[v1].pnbrs[0] = v0;
+						util[v0] = 1;
+					}
+				}
+			}
+		}
+    }
+
+		// complete vertex pairs
+    {
+		Int util[3*R3D_MAX_VERTS] = {0};
+		for(v0 = 0; v0 < numverts; ++v0)
+		for(v1 = v0 + 1; v1 < numverts; ++v1) {
+			for(v00 = vstart[v0]; v00 < vstart[v0] + eperv[v0]; ++v00)
+			for(v11 = vstart[v1]; v11 < vstart[v1] + eperv[v1]; ++v11) {
+				if(vbtmp[v00].pnbrs[1] == v1 && vbtmp[v11].pnbrs[1] == v0 
+						&& !util[v00] && !util[v11]) {
+					vbtmp[v00].pnbrs[1] = v11;
+					vbtmp[v11].pnbrs[1] = v00;
+					util[v00] = 1;
+					util[v11] = 1;
+				}
+			}
+		}
+    }
+
+		// remove unnecessary dummy vertices
+    {
+		Int util[3*R3D_MAX_VERTS] = {0};
+		for(v = 0; v < numverts; ++v) {
+			v0 = vstart[v];
+			v1 = vbtmp[v0].pnbrs[0];
+			v00 = vbtmp[v0].pnbrs[2];
+			v11 = vbtmp[v1].pnbrs[0];
+			vbtmp[v00].pnbrs[0] = vbtmp[v0].pnbrs[1];
+			vbtmp[v11].pnbrs[2] = vbtmp[v1].pnbrs[1];
+			for(np = 0; np < 3; ++np) if(vbtmp[vbtmp[v0].pnbrs[1]].pnbrs[np] == v0) break;
+			vbtmp[vbtmp[v0].pnbrs[1]].pnbrs[np] = v00;
+			for(np = 0; np < 3; ++np) if(vbtmp[vbtmp[v1].pnbrs[1]].pnbrs[np] == v1) break;
+			vbtmp[vbtmp[v1].pnbrs[1]].pnbrs[np] = v11;
+			util[v0] = 1;
+			util[v1] = 1;
+		}
+
+		// copy to the real vertbuffer and compress
+		numunclipped = 0;
+		for(v = 0; v < poly.nverts; ++v) {
+			if(!util[v]) {
+				poly.verts[numunclipped] = vbtmp[v];
+				util[v] = numunclipped++;
+			}
+		}
+		poly.nverts = numunclipped;
+		for(v = 0; v < poly.nverts; ++v) 
+			for(np = 0; np < 3; ++np)
+				poly.verts[v].pnbrs[np] = util[poly.verts[v].pnbrs[np]];
+    }
+	}
 }
 
 } // end namespace r3d
