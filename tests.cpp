@@ -7,33 +7,32 @@ namespace r3d {
 
 constexpr Real EPSILON = 1e-10;
 
-template <typename T> R3D_INLINE T max2(T a, T b) {
+template <typename T>
+R3D_INLINE T max2(T a, T b) {
   return (b > a) ? (b) : (a);
 }
 
 R3D_INLINE Real rel_diff_with_floor(Real a, Real b, Real floor = EPSILON) {
   Real am = fabs(a);
   Real bm = fabs(b);
-  if (am <= floor && bm <= floor)
-    return 0.0;
+  if (am <= floor && bm <= floor) return 0.0;
   return fabs(b - a) / max2(am, bm);
 }
 
-R3D_INLINE bool are_close(Real a, Real b, Real tol = EPSILON,
-                          Real floor = EPSILON) {
+R3D_INLINE bool are_close(
+    Real a, Real b, Real tol = EPSILON, Real floor = EPSILON) {
   return rel_diff_with_floor(a, b, floor) <= tol;
 }
 
 template <Int n>
-R3D_INLINE bool are_close(Vector<n> a, Vector<n> b, Real tol = EPSILON,
-                          Real floor = EPSILON) {
+R3D_INLINE bool are_close(
+    Vector<n> a, Vector<n> b, Real tol = EPSILON, Real floor = EPSILON) {
   for (Int i = 0; i < n; ++i)
-    if (!are_close(a[i], b[i], tol, floor))
-      return false;
+    if (!are_close(a[i], b[i], tol, floor)) return false;
   return true;
 }
 
-} // end namespace r3d
+}  // end namespace r3d
 
 static void test_3d() {
   r3d::Few<r3d::Vector<3>, 4> verts = {
