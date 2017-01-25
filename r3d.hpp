@@ -1004,6 +1004,61 @@ void init_poly(Polytope<2>& poly, Vector<2>* vertices, Int numverts) {
 	}
 }
 
+/**
+ * \brief Get all faces (unit normals and distances to the origin)
+ * from a full boundary description of a polyhedron.
+ *
+ * \param [out] faces
+ * Array of planes of length `numfaces` defining the faces of the polyhedron.
+ *
+ * \param [in] vertices
+ * Array of length `numverts` giving the vertices of the input polyhedron. 
+ *
+ * \param [in] numverts
+ * Number of vertices in the input polyhedron. 
+ *
+ * \param [in] faceinds
+ * Connectivity array, giving the indices of vertices in the 
+ * order they appear around each face of the input polyhedron.
+ *
+ * \param [in] numvertsperface
+ * An array of length `numfaces` giving the number of vertices for each face
+ * of the input polyhedron. 
+ *
+ * \param [in] numfaces
+ * Number of faces in the input polyhedron. 
+ *
+ */
+void poly_faces_from_verts(Plane<3>* faces, Vector<3>* vertices, Int numverts, 
+						Int** faceinds, Int* numvertsperface, Int numfaces) {
+	// dummy vars
+	Int v, f;
+	Vector<3> p0, p1, p2;
+
+	// calculate a centroid and a unit normal for each face 
+	for(f = 0; f < numfaces; ++f) {
+    auto centroid = vector_3(0,0,0);
+    faces[f].n = vector_3(0,0,0);
+		
+		for(v = 0; v < numvertsperface[f]; ++v) {
+
+			// add cross product of edges to the total normal
+			p0 = vertices[faceinds[f][v]];
+			p1 = vertices[faceinds[f][(v+1) % numvertsperface[f]]];
+			p2 = vertices[faceinds[f][(v+2) % numvertsperface[f]]];
+      faces[f].n = faces[f].n + cross(p1 - p0, p2 - p0);
+
+			// add the vertex position to the centroid
+      centroid = centroid + p0;
+		}
+
+		// normalize the normals and set the signed distance to origin
+    centroid = centroid / Real(numvertsperface[f]);
+    faces[f].n = normalize(faces[f].n);
+		faces[f].d = -(faces[f].n * centroid);
+	}
+}
+
 } // end namespace r3d
 
 #endif
