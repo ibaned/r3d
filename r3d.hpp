@@ -818,7 +818,7 @@ R3D_INLINE void intersect_simplices(Polytope<dim> &poly,
  *
  */
 R3D_INLINE void init_poly(Polytope<3> &poly, Vector<3> *vertices, Int numverts,
-               Int **faceinds, Int *numvertsperface, Int numfaces) {
+                          Int **faceinds, Int *numvertsperface, Int numfaces) {
   // dummy vars
   Int v, vprev, vcur, vnext, f, np;
 
@@ -1002,7 +1002,8 @@ R3D_INLINE void init_poly(Polytope<3> &poly, Vector<3> *vertices, Int numverts,
  * Number of vertices in the input polygon.
  *
  */
-R3D_INLINE void init_poly(Polytope<2> &poly, Vector<2> *vertices, Int numverts) {
+R3D_INLINE void init_poly(Polytope<2> &poly, Vector<2> *vertices,
+                          Int numverts) {
   poly.nverts = numverts;
   Int v;
   for (v = 0; v < poly.nverts; ++v) {
@@ -1035,7 +1036,8 @@ R3D_INLINE void init_poly(Polytope<2> &poly, Vector<2> *vertices, Int numverts) 
  *
  */
 R3D_INLINE void poly_faces_from_verts(Plane<3> *faces, Vector<3> *vertices,
-                           Int **faceinds, Int *numvertsperface, Int numfaces) {
+                                      Int **faceinds, Int *numvertsperface,
+                                      Int numfaces) {
   // dummy vars
   Int v, f;
   Vector<3> p0, p1, p2;
