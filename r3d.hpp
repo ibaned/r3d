@@ -794,6 +794,30 @@ R3D_INLINE void intersect_simplices(Polytope<dim> &poly,
   clip(poly, faces1);
 }
 
+/**
+ * \brief Initialize a general polyhedron from a full boundary description.
+ *
+ * \param [out] poly
+ * The polyhedron to initialize. 
+ *
+ * \param [in] vertices
+ * Array of length `numverts` giving the vertices of the input polyhedron. 
+ *
+ * \param [in] numverts
+ * Number of vertices in the input polyhedron. 
+ *
+ * \param [in] faceinds
+ * Connectivity array, giving the indices of vertices in the 
+ * order they appear around each face of the input polyhedron.
+ *
+ * \param [in] numvertsperface
+ * An array of length `numfaces` giving the number of vertices for each face
+ * of the input polyhedron. 
+ *
+ * \param [in] numfaces
+ * Number of faces in the input polyhedron. 
+ *
+ */
 void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts, 
 					Int** faceinds, Int* numvertsperface, Int numfaces) {
 	// dummy vars
@@ -954,6 +978,29 @@ void init_poly(Polytope<3>& poly, Vector<3>* vertices, Int numverts,
 			for(np = 0; np < 3; ++np)
 				poly.verts[v].pnbrs[np] = util[poly.verts[v].pnbrs[np]];
     }
+	}
+}
+
+/**
+ * \brief Initialize a (simply-connected) general polygon from a list of vertices. 
+ *
+ * \param [out] poly
+ * The polygon to initialize. 
+ *
+ * \param [in] vertices
+ * Array of length `numverts` giving the vertices of the input polygon, in counterclockwise order.
+ *
+ * \param [in] numverts
+ * Number of vertices in the input polygon. 
+ *
+ */
+void init_poly(Polytope<2>& poly, Vector<2>* vertices, Int numverts) {
+	poly.nverts = numverts;
+	Int v;
+	for(v = 0; v < poly.nverts; ++v) {
+		poly.verts[v].pos = vertices[v];
+		poly.verts[v].pnbrs[0] = (v+1)%(poly.nverts);
+		poly.verts[v].pnbrs[1] = (poly.nverts+v-1)%(poly.nverts);
 	}
 }
 
