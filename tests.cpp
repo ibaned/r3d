@@ -32,6 +32,20 @@ R3D_INLINE bool are_close(
   return true;
 }
 
+template <Int dim>
+R3D_INLINE bool operator==(Polytope<dim> const& a, Polytope<dim> const& b) {
+  if (a.nverts != b.nverts) return false;
+  for (Int i = 0; i < a.nverts; ++i) {
+    for (Int j = 0; j < dim; ++j) {
+      if (a.verts[i].pnbrs[j] != b.verts[i].pnbrs[j]) return false;
+    }
+    for (Int j = 0; j < dim; ++j) {
+      if (a.verts[i].pos[j] != b.verts[i].pos[j]) return false;
+    }
+  }
+  return true;
+}
+
 }  // end namespace r3d
 
 static void test_3d() {
@@ -105,7 +119,52 @@ static void test_2d() {
   assert(null_intersection.nverts == 0);
 }
 
+static void test_3d_split() {
+  r3d::Polytope<3> polys[3];
+  r3d::Polytope<3> inpolys[3];
+  r3d::Polytope<3> out_pos[3];
+  r3d::Polytope<3> out_neg[3];
+  r3d::init(polys[0], {{1,1,1}, {1,-1,-1}    , {-1,-1,1}  , {-1,1,-1}  });
+  r3d::init(polys[1], {{1+2,1,1}, {1+2,-1,-1}, {-1+2,-1,1}, {-1+2,1,-1}});
+  r3d::init(polys[2], {{1-2,1,1}, {1-2,-1,-1}, {-1-2,-1,1}, {-1-2,1,-1}});
+  for (int i = 0; i < 3; ++i) inpolys[i] = polys[i];
+  r3d::split(inpolys, 3, {{1,0,0},0}, out_pos, out_neg);
+  assert(out_neg[1].nverts == 0);
+  assert(out_pos[2].nverts == 0);
+  assert(polys[1] == out_pos[1]);
+  assert(polys[2] == out_neg[2]);
+  auto a = 2.0 * std::sqrt(2.0);
+  auto volume = std::sqrt(2.0) * a * a * a / 12.0;
+  assert(r3d::are_close(volume, r3d::measure(polys[0])));
+  assert(r3d::are_close(volume / 2.0, r3d::measure(out_pos[0])));
+  assert(r3d::are_close(volume / 2.0, r3d::measure(out_neg[0])));
+}
+
+static void test_2d_split() {
+  r3d::Polytope<2> polys[3];
+  r3d::Polytope<2> inpolys[3];
+  r3d::Polytope<2> out_pos[3];
+  r3d::Polytope<2> out_neg[3];
+  r3d::init(polys[0], {{1,0,0}, {0,2,0}, {-1,0,0}});
+  r3d::init(polys[1], {{1+2,0,0}, {0+2,2,0}, {-1+2,0,0}});
+  r3d::init(polys[2], {{1-2,0,0}, {0-2,2,0}, {-1-2,0,0}});
+  for (int i = 0; i < 3; ++i) inpolys[i] = polys[i];
+  r3d::split(inpolys, 3, {{1,0,0},0}, out_pos, out_neg);
+  assert(out_neg[1].nverts == 0);
+  assert(out_pos[2].nverts == 0);
+  assert(polys[1] == out_pos[1]);
+  assert(polys[2] == out_neg[2]);
+  auto base = 2.0;
+  auto height = 2.0;
+  auto area = base * height / 2.0;
+  assert(r3d::are_close(area, r3d::measure(polys[0])));
+  assert(r3d::are_close(area / 2.0, r3d::measure(out_pos[0])));
+  assert(r3d::are_close(area / 2.0, r3d::measure(out_neg[0])));
+}
+
 int main() {
   test_2d();
   test_3d();
+  test_3d_split();
+  test_2d_split();
 }

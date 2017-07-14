@@ -1148,6 +1148,164 @@ R3D_INLINE void poly_faces_from_verts(Plane<3>* faces, Vector<3>* vertices,
   }
 }
 
+template <Int dim>
+struct SplitHelper;
+
+template <>
+struct SplitHelper<3> {
+  static R3D_INLINE void insert_left_vertex(Polytope<3>& inpoly, Int vcur, Int) {
+    inpoly.verts[inpoly.nverts].pnbrs[0] = vcur;
+  }
+  static R3D_INLINE void insert_right_vertex(
+      Polytope<3>& inpoly, Int vcur, Int, Int vnext) {
+    inpoly.verts[inpoly.nverts].pnbrs[0] = vnext;
+    Int npnxt;
+    for(npnxt = 0; npnxt < 3; ++npnxt) {
+      if (inpoly.verts[vnext].pnbrs[npnxt] == vcur) break;
+    }
+    inpoly.verts[vnext].pnbrs[npnxt] = inpoly.nverts;
+  }
+  static R3D_INLINE bool begin_neighbor_search(
+      Polytope<3>& inpoly, Int& vcur, Int& vnext, Int vstart) {
+    vcur = vstart;
+    vnext = inpoly.verts[vcur].pnbrs[0];
+    return true;
+  }
+  static R3D_INLINE void continue_neighbor_search(
+      Polytope<3>& inpoly, Int& vcur, Int& vnext) {
+    Int np;
+    for (np = 0; np < 3; ++np) {
+      if(inpoly.verts[vnext].pnbrs[np] == vcur) break;
+    }
+    vcur = vnext;
+    auto pnext = (np + 1) % 3;
+    vnext = inpoly.verts[vcur].pnbrs[pnext];
+  }
+};
+
+template <>
+struct SplitHelper<2> {
+  static R3D_INLINE void insert_left_vertex(Polytope<2>& inpoly, Int vcur, Int np) {
+    inpoly.verts[inpoly.nverts].pnbrs[np] = -1;
+    inpoly.verts[inpoly.nverts].pnbrs[1 - np] = vcur;
+  }
+  static R3D_INLINE void insert_right_vertex(
+      Polytope<2>& inpoly, Int, Int np, Int vnext) {
+    inpoly.verts[inpoly.nverts].pnbrs[1 - np] = -1;
+    inpoly.verts[inpoly.nverts].pnbrs[np] = vnext;
+    inpoly.verts[vnext].pnbrs[1 - np] = inpoly.nverts;
+  }
+  static R3D_INLINE bool begin_neighbor_search(
+      Polytope<2>& inpoly, Int& vcur, Int&, Int vstart) {
+    if(inpoly.verts[vstart].pnbrs[1] >= 0) return false;
+    vcur = inpoly.verts[vstart].pnbrs[0];
+    return true;
+  }
+  static R3D_INLINE void continue_neighbor_search(
+      Polytope<2>& inpoly, Int& vcur, Int&) {
+    vcur = inpoly.verts[vcur].pnbrs[0];
+  }
+};
+
+template <Int dim>
+R3D_INLINE void split(Polytope<dim>& inpoly, Plane<dim> const plane,
+    Polytope<dim>& out_pos, Polytope<dim>& out_neg) {
+  Int side[MaxVerts<dim>::value] = {0};
+  Real sdists[MaxVerts<dim>::value];
+  Polytope<dim>* outpolys[2];
+
+  outpolys[0] = &out_pos;
+  outpolys[1] = &out_neg;
+  if(inpoly.nverts <= 0) {
+    outpolys[0]->nverts = 0;
+    outpolys[1]->nverts = 0;
+    return;
+  } 
+
+  // calculate signed distances to the clip plane
+  Int nneg = 0;
+  for (Int v = 0; v < inpoly.nverts; ++v) {
+    sdists[v] = plane.d + (inpoly.verts[v].pos * plane.n);
+    if(sdists[v] < 0.0) {
+      side[v] = 1;
+      nneg++;
+    }
+  }
+
+  // return if the poly lies entirely on one side of it 
+  if (nneg == 0) {
+    *(outpolys[0]) = inpoly; 
+    outpolys[1]->nverts = 0;
+    return;
+  }
+  if (nneg == inpoly.nverts) {
+    *(outpolys[1]) = inpoly;
+    outpolys[0]->nverts = 0;
+    return;
+  }
+
+  // check all edges and insert new vertices on the bisected edges 
+  auto onv = inpoly.nverts;
+  for (Int vcur = 0; vcur < onv; ++vcur) {
+    if (side[vcur]) continue;
+    for (Int np = 0; np < 3; ++np) {
+      auto vnext = inpoly.verts[vcur].pnbrs[np];
+      if (!side[vnext]) continue;
+      auto newpos = wav(inpoly.verts[vcur].pos, -sdists[vnext],
+          inpoly.verts[vnext].pos, sdists[vcur]);
+      inpoly.verts[inpoly.nverts].pos = newpos;
+      SplitHelper<dim>::insert_left_vertex(inpoly, vcur, np);
+      inpoly.verts[vcur].pnbrs[np] = inpoly.nverts;
+      (inpoly.nverts)++;
+      inpoly.verts[inpoly.nverts].pos = newpos;
+      side[inpoly.nverts] = 1;
+      SplitHelper<dim>::insert_right_vertex(inpoly, vcur, np, vnext);
+      (inpoly.nverts)++;
+    }
+  }
+
+  // for each new vert, search around the faces for its new neighbors
+  // and doubly-link everything
+  for (Int vstart = onv; vstart < inpoly.nverts; ++vstart) {
+    Int vcur, vnext;
+    SplitHelper<dim>::begin_neighbor_search(inpoly, vcur, vnext, vstart);
+    do {
+      SplitHelper<dim>::continue_neighbor_search(inpoly, vcur, vnext);
+    } while(vcur < onv);
+    inpoly.verts[vstart].pnbrs[dim - 1] = vcur;
+    // TODO: this will fail in 1D:
+    inpoly.verts[vcur].pnbrs[dim - 2] = vstart;
+  }
+
+  // copy and compress vertices Into their new buffers
+  // reusing side[] for reindexing
+  onv = inpoly.nverts;
+  outpolys[0]->nverts = 0;
+  outpolys[1]->nverts = 0;
+  for (Int v = 0; v < onv; ++v) {
+    auto cside = side[v];
+    outpolys[cside]->verts[outpolys[cside]->nverts] = inpoly.verts[v];
+    side[v] = (outpolys[cside]->nverts)++;
+  }
+
+  for(Int v = 0; v < outpolys[0]->nverts; ++v) {
+    for(Int np = 0; np < dim; ++np) {
+      outpolys[0]->verts[v].pnbrs[np] = side[outpolys[0]->verts[v].pnbrs[np]];
+    }
+  }
+  for(Int v = 0; v < outpolys[1]->nverts; ++v) {
+    for(Int np = 0; np < dim; ++np) {
+      outpolys[1]->verts[v].pnbrs[np] = side[outpolys[1]->verts[v].pnbrs[np]];
+    }
+  }
+}
+
+template <Int dim>
+R3D_INLINE void split(Polytope<dim>* inpolys, Int npolys, Plane<dim> const plane,
+    Polytope<dim>* out_pos, Polytope<dim>* out_neg) {
+  for (Int i = 0; i < npolys; ++i) split(inpolys[i], plane, out_pos[i], out_neg[i]);
+}
+
 }  // end namespace r3d
 
 #endif
