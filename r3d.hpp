@@ -378,7 +378,7 @@ R3D_INLINE void clip(Polytope<dim>& poly, Plane<dim> const* planes, Int nplanes)
   Int v, p, np, onv, vcur, vnext, numunclipped;
 
   // signed distances to the clipping plane
-  Real sdists[Polytope<2>::max_verts];
+  Real sdists[Polytope<dim>::max_verts];
   Real smin, smax;
 
   // loop over each clip plane
